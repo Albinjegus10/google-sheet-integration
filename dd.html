@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Animated Notice Board</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+<style>
+        body {
+            background: linear-gradient(135deg, #1a1c20 0%, #2d3436 100%);
+            color: white;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+ 
+        .notice-board {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+ 
+        .notice-board::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, 
+                rgba(255, 255, 255, 0.1) 0%,
+                rgba(255, 255, 255, 0.05) 100%);
+            z-index: -1;
+        }
+
+        .notice-form {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .form-control, .form-select {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        .form-control:focus, .form-select:focus {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: #00ff88;
+            color: white;
+            box-shadow: 0 0 0 0.25rem rgba(0, 255, 136, 0.25);
+        }
+
+        .form-control::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+ 
+        .notice-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            transform: translateX(-100%);
+            opacity: 0;
+            animation: slideIn 0.5s forwards;
+        }
+ 
+        .notice-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: scale(1.02);
+            transition: all 0.3s ease;
+        }
+ 
+        .notice-title {
+            color: #00ff88;
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+        }
+ 
+        .notice-date {
+            color: #ff9900;
+            font-size: 0.9rem;
+        }
+ 
+        .notice-content {
+            margin-top: 1rem;
+            line-height: 1.6;
+        }
+ 
+        @keyframes slideIn {
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+ 
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #00ff88;
+        }
+ 
+        #notice-container {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+ 
+        /* Custom Scrollbar */
+        #notice-container::-webkit-scrollbar {
+            width: 8px;
+        }
+ 
+        #notice-container::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+ 
+        #notice-container::-webkit-scrollbar-thumb {
+            background: rgba(0, 255, 136, 0.5);
+            border-radius: 4px;
+        }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="notice-form mb-4">
+        <h2 class="text-center mb-4">📝 Add New Notice</h2>
+        <form id="noticeForm">
+            <div class="mb-3">
+                <label for="title" class="form-label">Title</label>
+                <input type="text" class="form-control" id="title" required>
+            </div>
+            <div class="mb-3">
+                <label for="content" class="form-label">Content</label>
+                <textarea class="form-control" id="content" rows="3" required></textarea>
+            </div>
+            <div class="mb-3">
+                <label for="priority" class="form-label">Priority</label>
+                <select class="form-select" id="priority">
+                    <option value="normal">Normal</option>
+                    <option value="high">High</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-success w-100">Add Notice</button>
+        </form>
+    </div>
+
+<div class="notice-board">
+<h1 class="text-center mb-4">
+<span class="text-warning">📌</span> Notice Board
+</h1>
+<div id="notice-container">
+<div class="loading">Loading notices...</div>
+</div>
+</div>
+</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+<script>
+        // Replace with your Google Sheets API key and Sheet ID
+        const SHEET_ID = '1_tiSkO24-nu5QP7k_KJghizFl97xbrjqzp3GVsIPdJk';
+        const API_KEY = 'AIzaSyAMPhWJY_X6FCwUsILGFTsg7C4c-OHbiZo';
+        const RANGE = 'Sheet1!A2:D'; // Adjust based on your sheet structure
+
+        function fetchNotices() {
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${RANGE}?key=${API_KEY}`;
+            $.get(url)
+                .done(function(response) {
+                    const notices = response.values || [];
+                    displayNotices(notices);
+                })
+                .fail(function(error) {
+                    console.error('Error fetching notices:', error);
+                    $('#notice-container').html('<div class="alert alert-danger">Error loading notices</div>');
+                });
+        }
+        async function submitNotice(event) {
+        event.preventDefault();
+
+        const title = $('#title').val();
+        const content = $('#content').val();
+        const priority = $('#priority').val();
+        const date = new Date().toLocaleDateString();
+
+        // Google Apps Script deployment URL (you need to create this)
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbySB4OKR9L5zf-tG6yTaW17aOGqvdhjDhZuqyVzd3CLPXe4RmpU1pX74HXzfLDMtA3ObQ/exec';
+
+        try {
+            const response = await fetch(SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    title,
+                    date,
+                    content,
+                    priority
+                })
+            });
+
+            // Clear form
+            $('#noticeForm')[0].reset();
+
+            // Refresh notices
+            fetchNotices();
+
+            // Show success message
+            alert('Notice added successfully!');
+        } catch (error) {
+            console.error('Error submitting notice:', error);
+            alert('Error adding notice. Please try again.');
+        }
+    }
+
+    // Event listeners
+    $('#noticeForm').on('submit', submitNotice);
+
+
+
+
+        function displayNotices(notices) {
+            const container = $('#notice-container');
+            container.empty();
+
+            if (notices.length === 0) {
+                container.html('<div class="text-center">No notices available</div>');
+                return;
+            }
+
+            notices.forEach((notice, index) => {
+                const [title, date, content, priority] = notice;
+                const delay = index * 200;
+
+                const noticeElement = $(`
+<div class="notice-item" style="animation-delay: ${delay}ms;">
+<div class="notice-title">${title}</div>
+<div class="notice-date">${date}</div>
+<div class="notice-content">${content}</div>
+                        ${priority === 'high' ? '<span class="badge bg-danger">Important</span>' : ''}
+</div>
+                `);
+
+                container.append(noticeElement);
+            });
+        }
+
+        // Fetch notices every 5 minutes
+        fetchNotices();
+        setInterval(fetchNotices, 300000);
+</script>
+</body>
+</html>
